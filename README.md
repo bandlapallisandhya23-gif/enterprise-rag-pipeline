@@ -1,5 +1,13 @@
 # Enterprise RAG Data Engineering Pipeline
 
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-REST-green)
+![Apache Airflow](https://img.shields.io/badge/Airflow-2.9.2-red)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-blue)
+![LangChain](https://img.shields.io/badge/LangChain-RAG-success)
+
+
 A production-grade, enterprise-ready Retrieval-Augmented Generation (RAG) data engineering pipeline. It automates PDF ingestion, performs text chunking and metadata enrichment, generates vector embeddings, stores them in PostgreSQL `pgvector`, and exposes a FastAPI REST API for semantic search and Q&A powered by LangChain.
 
 Designed to operate **100% locally and offline by default** (using SentenceTransformers), with **optional configuration for OpenAI GPT models**.
@@ -138,6 +146,12 @@ The Airflow DAG runs on a **1-minute cron scheduler** (customizable in the DAG).
 
 Once the container is up, visit the interactive Swagger UI documentation at: **`http://localhost:8000/docs`**.
 
+### API Documentation Screenshot
+
+FastAPI Swagger UI provides interactive API testing and documentation.
+
+![Swagger API](screenshots/API.png)
+
 ### Key Endpoints
 
 #### 1. System Health
@@ -167,6 +181,12 @@ curl -X 'POST' \
   -H 'Content-Type: multipart/form-data' \
   -F 'file=@data/input/corporate_policy.pdf;type=application/pdf'
 ```
+### Document Upload Example
+
+The API accepts PDF documents and sends them into the ingestion pipeline.
+
+![Document Upload](screenshots/Document-upload.png)
+
 
 #### 4. Retrieval Q&A (Semantic Search)
 - **Endpoint**: `POST /query`
@@ -177,6 +197,12 @@ curl -X 'POST' \
   "question": "What is the policy on vacation rollover?",
   "limit": 3
 }
+### Query Response Example
+
+The system performs vector similarity search using pgvector and returns relevant document chunks.
+
+![Query Response](screenshots/query-response.png)
+
 ```
 - **Example Response (Offline Mock Mode)**:
 ```json
