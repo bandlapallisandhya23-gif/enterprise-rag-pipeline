@@ -23,7 +23,7 @@ flowchart TB
     subgraph Storage ["Shared & Database Layer"]
         vol_in[("Shared Ingestion Dir<br>(/app/data/input)")]
         vol_proc[("Shared Archive Dir<br>(/app/data/processed)")]
-        pg_db[(("PostgreSQL + pgvector<br>(Port 5432)")]
+        pg_db[("PostgreSQL + pgvector<br>(Port 5432)")]
     end
 
     %% Airflow Stack
