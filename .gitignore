@@ -1,0 +1,26 @@
+# Environment secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+
+# Uploaded documents
+data/
+*.pdf
+
+# Docker logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

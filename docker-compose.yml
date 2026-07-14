@@ -1,0 +1,174 @@
+version: '3.8'
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile.airflow
+
+  environment:
+    AIRFLOW__WEBSERVER__SECRET_KEY: my_airflow_secret_key_12345
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+    AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+
+    RAG_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-rag_database}
+
+    DATA_DIR: ${DATA_DIR:-/app/data}
+
+    EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./data:/app/data
+
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+    db:
+      condition: service_healthy
+
+
+services:
+
+  # RAG Vector Database (PostgreSQL with pgvector)
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+
+    ports:
+      - "5432:5432"
+
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-rag_database}
+
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_database}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  # Airflow Metadata Database
+  airflow-db:
+    image: postgres:13
+    container_name: airflow-postgres
+
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  # Airflow Database Initialization Setup
+  airflow-init:
+    <<: *airflow-common
+
+    container_name: airflow-init
+
+    entrypoint: /bin/bash
+
+    command: >
+      -c "
+      airflow db init &&
+      airflow users create
+      --username admin
+      --firstname Admin
+      --lastname User
+      --role Admin
+      --email admin@example.com
+      --password admin
+      "
+
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+
+    container_name: airflow-scheduler
+
+    command: scheduler
+
+    restart: always
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  # Airflow Webserver
+  airflow-webserver:
+    <<: *airflow-common
+
+    container_name: airflow-webserver
+
+    command: webserver
+
+    ports:
+      - "8080:8080"
+
+    restart: always
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  # FastAPI Web Application
+  fastapi-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.api
+
+    container_name: fastapi-api
+
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+    environment:
+      - RAG_DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-rag_database}
+
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      - DATA_DIR=${DATA_DIR:-/app/data}
+
+    volumes:
+      - ./api:/app
+      - ./data:/app/data
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    restart: always
+
+
+
+volumes:
+  pgvector_data:
+  airflow_db_data:
+  rag_data:

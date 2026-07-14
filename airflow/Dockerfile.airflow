@@ -1,0 +1,24 @@
+FROM apache/airflow:2.9.2
+
+USER root
+# Install system packages (useful for python packages compiling C dependencies)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER root
+
+RUN mkdir -p /app/data/input /app/data/output && \
+    chown -R airflow:root /app/data && \
+    chmod -R 775 /app/data
+
+USER airflow
+
+# Copy and install python dependencies
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+
+# Pre-cache the default embedding model in the image to optimize startup and DAG execution
